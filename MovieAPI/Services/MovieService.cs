@@ -120,7 +120,9 @@ namespace MovieAPI.Services
             var comment = await context.Comments.FindAsync(commentId);
             if (comment != null)
             {
-                context.Remove(comment);
+                var movieComment = await context.MoviesComments.Where(mc => mc.CommentId == commentId).FirstOrDefaultAsync();
+                context.MoviesComments.Remove(movieComment);
+                context.Comments.Remove(comment);
                 await context.SaveChangesAsync();
                 return true;
             }
@@ -130,9 +132,33 @@ namespace MovieAPI.Services
         public async Task<bool> DeleteMovie(int id)
         {
             var movie = await context.Movies.FindAsync(id);
+            var movieImages = await context.MoviesImages.Where(x => x.MovieId == id).ToListAsync();
+            var movieRatings = await context.MoviesRatings.Where(x => x.MovieId == id).ToListAsync();
+            var movieComments = await context.MoviesComments.Where(x => x.MovieId == id).ToListAsync();
             if(movie != null) 
             {
-                context.Remove(movie);
+                if(movieImages.Any())
+                {
+                    context.MoviesImages.RemoveRange(movieImages);
+                }
+                if(movieRatings.Any())
+                {
+                    context.MoviesRatings.RemoveRange(movieRatings);
+                    foreach (var mr in movieRatings)
+                    {
+                        context.Ratings.Remove(mr.Rating);
+                    }
+                }
+                if(movieComments.Any())
+                {
+                    context.MoviesComments.RemoveRange(movieComments);
+                    foreach (var mc in movieComments)
+                    {
+                        context.Comments.Remove(mc.Comment);
+                    }
+                }
+
+                context.Movies.Remove(movie);
                 await context.SaveChangesAsync();
                 return true;
             }
@@ -400,8 +426,8 @@ namespace MovieAPI.Services
             
             if(image != null && moviesImages.Any())
             {
-                context.Images.Remove(image);
                 context.MoviesImages.RemoveRange(moviesImages);
+                context.Images.Remove(image);
                 await context.SaveChangesAsync();
 
                 return true;

@@ -165,7 +165,7 @@ namespace MovieAPI.Services
             return false;
         }
 
-        public async Task<List<GetAllMoviesDTO>> GetAllMovies()
+        public async Task<List<GetAllMoviesDTO>> GetAllMovies(int page, int perPage)
         {
             var movies = await context.Movies.Select(movie => new GetAllMoviesDTO
             {
@@ -183,7 +183,9 @@ namespace MovieAPI.Services
                 return null;
             }
 
-            return movies;
+            var skip = (page - 1) * perPage;
+
+            return movies.Skip(skip).Take(perPage).ToList();
         }
 
         public async Task<GetAllMoviesDTO> GetMovie(int id)

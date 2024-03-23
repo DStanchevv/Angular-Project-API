@@ -25,7 +25,7 @@ namespace MovieAPI.Services
         {
             var applicationUser = new ApplicationUser()
             {
-                UserName = register.Username,
+                UserName = register.Email.Split("@")[0],
                 Email = register.Email
             };
             
@@ -52,9 +52,9 @@ namespace MovieAPI.Services
             return null;
         }
 
-        public async Task<ApplicationUser> FindUser(string username)
+        public async Task<ApplicationUser> FindUser(string email)
         {
-            var user = await userManager.Users.FirstOrDefaultAsync(x => x.UserName == username.ToLower());
+            var user = await userManager.Users.FirstOrDefaultAsync(x => x.Email == email);
             if(user == null)
             {
                 return null;

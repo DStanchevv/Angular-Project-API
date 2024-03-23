@@ -1,6 +1,6 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MovieAPI.Data.Models;
 using MovieAPI.Services.Interfaces;
 using MovieAPI.ViewModels;
 using System.Security.Claims;
@@ -15,15 +15,15 @@ namespace MovieAPI.Controllers
             this.userService = userService;
         }
 
-        [HttpPost("login")]
-        public async Task<IActionResult> Login(LoginDTO login)
+        [HttpPost("/api/login")]
+        public async Task<IActionResult> Login([FromBody] LoginDTO login)
         {
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
             }
 
-            var user = await userService.FindUser(login.UserName);
+            var user = await userService.FindUser(login.Email);
 
             if(user == null)
             {
@@ -38,10 +38,22 @@ namespace MovieAPI.Controllers
             }
 
             var loggedUser = userService.GetLoggedUser(user);
-            return Ok(loggedUser);
+
+            HttpContext.Response.Cookies.Append("token", loggedUser.Token, new CookieOptions
+            {
+                HttpOnly = true,
+                Expires = DateTime.Now.AddDays(7),
+                SameSite = SameSiteMode.Lax,
+                Secure = false,
+                IsEssential = true,
+                Path = "/"
+                // You can customize other properties of the cookie like expiration, domain, etc. here
+            });
+
+            return Ok();
         }
 
-        [HttpPost("register")]
+        [HttpPost("/api/register")]
         public async Task<IActionResult> Register([FromBody] RegisterDTO register)
         {
             try
@@ -66,6 +78,14 @@ namespace MovieAPI.Controllers
             {
                 return BadRequest($"Something went wrong!");
             }
+        }
+
+        [HttpPost("/api/logout")]
+        [Authorize]
+        public async Task<IActionResult> Logout()
+        {
+            await HttpContext.SignOutAsync();
+            return Ok("Logged out successfully");
         }
 
         [HttpGet("get-all-comments")]

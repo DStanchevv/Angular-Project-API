@@ -5,7 +5,7 @@ namespace MovieAPI.Services.Interfaces
 {
     public interface IMovieService
     {
-        Task<List<GetAllMoviesDTO>> GetAllMovies();
+        Task<List<GetAllMoviesDTO>> GetAllMovies(int page, int perPage);
         Task<GetAllMoviesDTO> GetMovie(int id);
         Task<Movie> AddMovie(AddMovieDTO movie);
         Task<Movie> UpdateMovie(int movieId, UpdateMovieDTO updates);

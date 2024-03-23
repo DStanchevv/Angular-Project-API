@@ -10,6 +10,7 @@ namespace MovieAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class MovieController : ControllerBase
     {
         private readonly IMovieService movieService;
@@ -19,9 +20,9 @@ namespace MovieAPI.Controllers
         }
 
         [HttpGet("get-all-movies")]
-        public async Task<IActionResult> GetAllMovies()
+        public async Task<IActionResult> GetAllMovies([FromQuery]int page, [FromQuery]int perPage)
         {
-            var movies = await movieService.GetAllMovies();
+            var movies = await movieService.GetAllMovies(page, perPage);
             if(movies == null)
             {
                 return NotFound();

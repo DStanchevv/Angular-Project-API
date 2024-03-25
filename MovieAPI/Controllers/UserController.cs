@@ -37,7 +37,7 @@ namespace MovieAPI.Controllers
                 return Unauthorized("Username/Password not found!");
             }
 
-            var loggedUser = userService.GetLoggedUser(user);
+            var loggedUser = await userService.GetLoggedUser(user);
 
             HttpContext.Response.Cookies.Append("token", loggedUser.Token, new CookieOptions
             {
@@ -47,10 +47,9 @@ namespace MovieAPI.Controllers
                 Secure = false,
                 IsEssential = true,
                 Path = "/"
-                // You can customize other properties of the cookie like expiration, domain, etc. here
             });
 
-            return Ok();
+            return Ok(loggedUser);
         }
 
         [HttpPost("/api/register")]
@@ -82,10 +81,31 @@ namespace MovieAPI.Controllers
 
         [HttpPost("/api/logout")]
         [Authorize]
-        public async Task<IActionResult> Logout()
+        public IActionResult Logout()
         {
-            await HttpContext.SignOutAsync();
+            HttpContext.Response.Cookies.Delete("token", new CookieOptions { Path = "/" });
             return Ok("Logged out successfully");
+        }
+
+        [HttpGet("/api/profile")]
+        [Authorize]
+        public async Task<IActionResult> GetProfile()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized("User is not authenticated.");
+            }
+
+            var user = await userService.FindUserById(userId);
+
+            if (user == null)
+            {
+                return NotFound("User not found.");
+            }
+
+            return Ok(user);
         }
 
         [HttpGet("get-all-comments")]

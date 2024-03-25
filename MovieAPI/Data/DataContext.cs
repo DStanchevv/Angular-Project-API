@@ -42,7 +42,28 @@ namespace MovieAPI.Data
 
             builder.Entity<IdentityRole>().HasData(roles);
 
+            var hasher = new PasswordHasher<ApplicationUser>();
+            ApplicationUser adminUser = new ApplicationUser
+            {
+                Id = Guid.NewGuid().ToString(),
+                UserName = "admin@gmail.com",
+                Email = "admin@gmail.com",
+                NormalizedUserName = "ADMIN@GMAIL.COM",
+                NormalizedEmail = "ADMIN@GMAIL.COM",
+                EmailConfirmed = false,
+                SecurityStamp = Guid.NewGuid().ToString()
+            };
+            adminUser.PasswordHash = hasher.HashPassword(adminUser, "admin");
+
+            builder.Entity<ApplicationUser>().HasData(adminUser);
+            builder.Entity<IdentityUserRole<string>>().HasData(new IdentityUserRole<string>
+            {
+                RoleId = roles[0].Id,
+                UserId = adminUser.Id
+            });
+
             base.OnModelCreating(builder);
         }
+
     }
 }

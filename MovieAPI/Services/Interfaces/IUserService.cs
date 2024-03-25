@@ -10,7 +10,8 @@ namespace MovieAPI.Services.Interfaces
         Task<List<GetAllUserRatingsDTO>> GetAllUserRatings(string userId);
         Task<ApplicationUser> FindUser(string username);
         Task<SignInResult> TrySignIn(ApplicationUser user, string password);
-        NewUserDTO GetLoggedUser(ApplicationUser user);
+        Task<NewUserDTO> GetLoggedUser(ApplicationUser user);
         Task<NewUserDTO> CreateUser(RegisterDTO register);
+        Task<UserProfileDTO> FindUserById(string id);
     }
 }

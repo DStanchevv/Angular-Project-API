@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.BlazorIdentity.Pages.Manage;
 using MovieAPI.Data;
 using MovieAPI.Data.Models;
 using MovieAPI.Services.Interfaces;
@@ -38,8 +39,9 @@ namespace MovieAPI.Services
                 {
                     var newUser = new NewUserDTO()
                     {
-                        UserName = applicationUser.UserName,
+                        Username = applicationUser.Email.Split("@")[0],
                         Email = applicationUser.Email,
+                        Role = "User",
                         Token = tokenService.CreateToken(applicationUser)
                     };
                     return newUser;
@@ -60,6 +62,19 @@ namespace MovieAPI.Services
                 return null;
             }
             return user;
+        }
+
+        public async Task<UserProfileDTO> FindUserById(string id)
+        {
+            var user = await userManager.Users.FirstOrDefaultAsync(x => x.Id == id);
+            var role = await userManager.IsInRoleAsync(user, "User") ? "User" : "Admin";
+            var loggedUser = new UserProfileDTO
+            {
+                Username = user.Email.Split("@")[0],
+                Email = user.Email,
+                Role = role,
+            };
+            return loggedUser;
         }
 
         public async Task<List<GetAllUserCommentsDTO>> GetAllUserComments(string userId)
@@ -94,15 +109,34 @@ namespace MovieAPI.Services
             return ratings;
         }
 
-        public NewUserDTO GetLoggedUser(ApplicationUser user)
+        public async Task<NewUserDTO> GetLoggedUser(ApplicationUser user)
         {
-            var loggedUser = new NewUserDTO
+            if(user != null)
             {
-                UserName = user.UserName,
-                Email = user.Email,
-                Token = tokenService.CreateToken(user)
-            };
-            return loggedUser;
+                if(await userManager.IsInRoleAsync(user, "User"))
+                {
+                    var loggedUser = new NewUserDTO
+                    {
+                        Username = user.Email.Split("@")[0],
+                        Email = user.Email,
+                        Role = "User",
+                        Token = tokenService.CreateToken(user)
+                    };
+                    return loggedUser;
+                }
+                else
+                {
+                    var loggedUser = new NewUserDTO
+                    {
+                        Username = user.Email.Split("@")[0],
+                        Email = user.Email,
+                        Role = "Admin",
+                        Token = tokenService.CreateToken(user)
+                    };
+                    return loggedUser;
+                }
+            }
+            return null;  
         }
 
         public async Task<SignInResult> TrySignIn(ApplicationUser user, string password)

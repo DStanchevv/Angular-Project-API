@@ -19,8 +19,10 @@ namespace MovieAPI.Services.Interfaces
         Task<List<GetAllMoviesDTO>> GetMovieByName(string name);
         Task<List<GetAllMoviesDTO>> GetOrderedMovieByReleaseDateAsc();
         Task<List<GetAllMoviesDTO>> GetOrderedMovieByReleaseDateDesc();
+        Task<List<GetAllMoviesDTO>> GetOrderedMoviesById();
+        Task<List<GetAllMoviesDTO>> GetOrderedMovieByRatingDesc();
         Task<List<GetAllMoviesDTO>> GetOrderedMovieByNameAsc();
         Task<List<GetAllMoviesDTO>> GetOrderedMovieByNameDesc();
-        Task<bool> DeleteImage(int imageId, int movieId);
+        Task<bool> DeleteImage(string imageLink);
     }
 }

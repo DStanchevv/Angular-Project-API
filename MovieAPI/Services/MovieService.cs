@@ -81,7 +81,7 @@ namespace MovieAPI.Services
 
                         var image = await SaveImageToDatabase(filePath, context);
 
-                        await SaveMovieImageToDatabase(movieToAdd.Id, image.Id, context);
+                        await SaveMovieImageToDatabase(movieToAdd.Id, image.Id);
                     }
                 }
             }
@@ -97,12 +97,12 @@ namespace MovieAPI.Services
                 UserId = userId,
                 RatingScore = rating,
             };
-            await context.Ratings.AddAsync(newRating);
-
             if (movieRatings.Any(mr => mr.MovieId == movieId && mr.Rating.UserId == userId))
             {
                 return false;
             }
+            await context.Ratings.AddAsync(newRating);
+            await context.SaveChangesAsync();
             
             var movieRating = new MoviesRatings()
             {
@@ -132,37 +132,82 @@ namespace MovieAPI.Services
         public async Task<bool> DeleteMovie(int id)
         {
             var movie = await context.Movies.FindAsync(id);
-            var movieImages = await context.MoviesImages.Where(x => x.MovieId == id).ToListAsync();
-            var movieRatings = await context.MoviesRatings.Where(x => x.MovieId == id).ToListAsync();
-            var movieComments = await context.MoviesComments.Where(x => x.MovieId == id).ToListAsync();
-            if(movie != null) 
+            if (movie == null)
             {
-                if(movieImages.Any())
+                return false;
+            }
+
+            var movieImages = await context.MoviesImages.Where(x => x.MovieId == id).ToListAsync();
+            if (movieImages != null && movieImages.Any())
+            {
+                foreach (var mi in movieImages)
                 {
-                    context.MoviesImages.RemoveRange(movieImages);
+                    var img = await context.Images.FindAsync(mi.ImageId);
+                    if (img != null)
+                    {
+                        var fileName = Path.GetFileName(img.Path);
+
+                        var imagePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Images", "Movies", fileName);
+
+                        if (File.Exists(imagePath))
+                        {
+                            File.Delete(imagePath);
+                        }
+                    }
                 }
-                if(movieRatings.Any())
+                context.MoviesImages.RemoveRange(movieImages);
+            }
+
+            var movieRatings = await context.MoviesRatings.Where(x => x.MovieId == id).ToListAsync();
+            if (movieRatings != null && movieRatings.Any())
+            {
+                context.MoviesRatings.RemoveRange(movieRatings);
+                foreach (var mr in movieRatings)
                 {
-                    context.MoviesRatings.RemoveRange(movieRatings);
-                    foreach (var mr in movieRatings)
+                    if (mr.Rating != null) // Check if rating is null
                     {
                         context.Ratings.Remove(mr.Rating);
                     }
                 }
-                if(movieComments.Any())
+            }
+
+            var movieComments = await context.MoviesComments.Where(x => x.MovieId == id).ToListAsync();
+            if (movieComments != null && movieComments.Any())
+            {
+                context.MoviesComments.RemoveRange(movieComments);
+                foreach (var mc in movieComments)
                 {
-                    context.MoviesComments.RemoveRange(movieComments);
-                    foreach (var mc in movieComments)
+                    if (mc.Comment != null) // Check if comment is null
                     {
                         context.Comments.Remove(mc.Comment);
                     }
                 }
-
-                context.Movies.Remove(movie);
-                await context.SaveChangesAsync();
-                return true;
             }
-            return false;
+
+            context.Movies.Remove(movie);
+            await context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<List<GetAllMoviesDTO>> GetOrderedMoviesById()
+        {
+            var movies = await context.Movies.Select(m => new GetAllMoviesDTO
+            {
+                Id = m.Id,
+                Name = m.Name,
+                Description = m.Description,
+                ReleaseDate = m.ReleaseDate,
+                DirectorName = m.DirectorName,
+                Length = m.Length,
+                Images = context.MoviesImages.Where(mi => mi.MovieId == m.Id).Include(mi => mi.Image).Select(mi => mi.Image.Path).ToList(),
+            }).OrderByDescending(m => m.Id).ToListAsync();
+
+            if (movies.Count == 0)
+            {
+                return null;
+            }
+
+            return movies;
         }
 
         public async Task<List<GetAllMoviesDTO>> GetAllMovies(int page, int perPage)
@@ -199,6 +244,8 @@ namespace MovieAPI.Services
                 ReleaseDate = movie.ReleaseDate,
                 Length = movie.Length,
                 Images = context.MoviesImages.Where(mi => mi.MovieId == id).Include(mi => mi.Image).Select(mi => mi.Image.Path).ToList(),
+                Comments = context.MoviesComments.Where(mc => mc.MovieId == id).Include(mc => mc.Comment).OrderByDescending(mc => mc.CommentId).Select(mc => $"{mc.CommentId}-{mc.Comment.User.Email}-{mc.Comment.Description}").ToList(),
+                Rating = context.MoviesRatings.Where(mr => mr.MovieId == id).Include(mr => mr.Rating).Average(mr => mr.Rating.RatingScore).ToString(),
             }).FirstOrDefaultAsync();
 
             if(movie == null) 
@@ -236,9 +283,10 @@ namespace MovieAPI.Services
             var comments = await context.MoviesComments.Where(x => x.MovieId == movieId).Select(x =>
             new GetAllMovieCommentsDTO 
             {
+                Id = x.CommentId,
                 User = x.Comment.User.UserName,
                 Description = x.Comment.Description,
-            }).ToListAsync();
+            }).OrderByDescending(mc => mc.Id).ToListAsync();
 
             if(comments.Count() == 0) 
             {
@@ -391,7 +439,7 @@ namespace MovieAPI.Services
 
                         var image = await SaveImageToDatabase(filePath, context);
 
-                        await SaveMovieImageToDatabase(movieToUpdate.Id, image.Id, context);
+                        await SaveMovieImageToDatabase(movieToUpdate.Id, image.Id);
                     }
                 }
             }
@@ -401,9 +449,10 @@ namespace MovieAPI.Services
             return movieToUpdate;
         }
 
-        public async Task<Rating> UpdateRating(int ratingId, string userId, int rating)
+        public async Task<Rating> UpdateRating(int movieId, string userId, int rating)
         {
-            var ratingToUpdate = await context.Ratings.Where(r => r.Id == ratingId && r.UserId == userId).FirstOrDefaultAsync();
+            var ratingToUpdate = await context.MoviesRatings.Where(mr => mr.MovieId == movieId && mr.Rating.UserId == userId).FirstOrDefaultAsync();
+            var newRating = await context.Ratings.Where(r => r.Id == ratingToUpdate.RatingId).FirstOrDefaultAsync();
 
             if (ratingToUpdate == null)
             {
@@ -412,25 +461,39 @@ namespace MovieAPI.Services
 
             if(rating >= 1 && rating <= 10) 
             { 
-                ratingToUpdate.RatingScore = rating;
+                newRating.RatingScore = rating;
                 
                 await context.SaveChangesAsync();
-                return ratingToUpdate;
+                return newRating;
             }
 
             return null;
         }
 
-        public async Task<bool> DeleteImage(int imageId, int movieId)
+        public async Task<bool> DeleteImage(string imgLink)
         {
-            var image = await context.Images.FindAsync(imageId);
-            var moviesImages = await context.MoviesImages.Where(mi => mi.ImageId == imageId && mi.MovieId == movieId).ToListAsync();
+            var image = await context.Images.Where(i => i.Path == imgLink).FirstOrDefaultAsync();
             
-            if(image != null && moviesImages.Any())
+            if(image != null)
             {
-                context.MoviesImages.RemoveRange(moviesImages);
+                var moviesImages = await context.MoviesImages.Where(mi => mi.ImageId == image.Id).ToListAsync();
+                if(moviesImages.Any()) 
+                {
+                    context.MoviesImages.RemoveRange(moviesImages);
+                    await context.SaveChangesAsync();
+                }
+
                 context.Images.Remove(image);
                 await context.SaveChangesAsync();
+
+                var fileName = Path.GetFileName(imgLink);
+
+                var imagePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Images", "Movies", fileName);
+
+                if (File.Exists(imagePath))
+                {
+                    File.Delete(imagePath);
+                }
 
                 return true;
             }
@@ -478,11 +541,50 @@ namespace MovieAPI.Services
             return image;
         }
 
-        private async Task SaveMovieImageToDatabase(int movieId, int imageId, DataContext context)
+        private async Task SaveMovieImageToDatabase(int movieId, int imageId)
         {
             var movieImage = new MoviesImages { MovieId = movieId, ImageId = imageId };
             await context.MoviesImages.AddAsync(movieImage);
             await context.SaveChangesAsync();
+        }
+
+        public async Task<List<GetAllMoviesDTO>> GetOrderedMovieByRatingDesc()
+        {
+            var moviesWithRatings = await context.Movies
+                .Select(m => new
+                {
+                    Movie = m,
+                    AverageRating = context.MoviesRatings
+                        .Where(mr => mr.MovieId == m.Id)
+                        .Select(mr => (double?)mr.Rating.RatingScore)
+                        .DefaultIfEmpty()
+                        .Average()
+                })
+                .OrderByDescending(m => m.AverageRating)
+                .ToListAsync();
+
+            var movies = moviesWithRatings.Select(m => new GetAllMoviesDTO
+            {
+                Id = m.Movie.Id,
+                Name = m.Movie.Name,
+                Description = m.Movie.Description,
+                ReleaseDate = m.Movie.ReleaseDate,
+                DirectorName = m.Movie.DirectorName,
+                Length = m.Movie.Length,
+                Rating = m.AverageRating.HasValue ? m.AverageRating.Value.ToString() : "N/A",
+                Images = context.MoviesImages
+                    .Where(mi => mi.MovieId == m.Movie.Id)
+                    .Include(mi => mi.Image)
+                    .Select(mi => mi.Image.Path)
+                    .ToList(),
+            }).ToList();
+
+            if (movies.Count == 0)
+            {
+                return null;
+            }
+
+            return movies;
         }
     }
 }

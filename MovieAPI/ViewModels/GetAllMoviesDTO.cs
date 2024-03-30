@@ -8,6 +8,8 @@
         public DateTime ReleaseDate { get; set; }
         public string DirectorName { get; set; } = null!;
         public int Length { get; set; }
+        public string Rating { get; set; }
         public List<string> Images { get; set; } = null!;
+        public List<string> Comments { get; set; } = null!;
     }
 }

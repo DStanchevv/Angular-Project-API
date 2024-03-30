@@ -45,6 +45,7 @@ namespace MovieAPI.Controllers
 
         //[Authorize(Roles = "Admin")]
         [HttpPost("create-movie")]
+        [Consumes("multipart/form-data")]
         public async Task<IActionResult> AddMovie([FromForm]AddMovieDTO movie)
         {
             if(ModelState.IsValid) 
@@ -178,13 +179,13 @@ namespace MovieAPI.Controllers
             return BadRequest();
         }
         //[Authorize]
-        [HttpPut("update-rating")]
-        public async Task<IActionResult> UpdateReview(int ratingId, int rating)
+        [HttpPut("update-rating/{movieId}")]
+        public async Task<IActionResult> UpdateReview([FromRoute]int movieId, int rating)
         {
             if (ModelState.IsValid)
             {
                 var id = User.FindFirstValue(ClaimTypes.NameIdentifier);
-                var updatedRating = await movieService.UpdateRating(ratingId, User.FindFirstValue(ClaimTypes.NameIdentifier), rating);
+                var updatedRating = await movieService.UpdateRating(movieId, User.FindFirstValue(ClaimTypes.NameIdentifier), rating);
                 if (updatedRating == null)
                 {
                     return BadRequest();
@@ -233,6 +234,20 @@ namespace MovieAPI.Controllers
 
             return Ok(movie);
         }
+        
+        [HttpGet("order-movie-by-rating-desc")]
+        public async Task<IActionResult> OrderMovieByRatingDesc()
+        {
+            var movie = await movieService.GetOrderedMovieByRatingDesc();
+
+            if (movie == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(movie);
+        }
+
 
         [HttpGet("order-movie-by-name-asc")]
         public async Task<IActionResult> OrderMovieByNameAsc()
@@ -260,10 +275,23 @@ namespace MovieAPI.Controllers
             return Ok(movie);
         }
 
-        [HttpDelete("delete-image")]
-        public async Task<IActionResult> DeleteImageById(int imageId, int movieId)
+        [HttpGet("order-movie-by-id-desc")]
+        public async Task<IActionResult> OrderMoviesById()
         {
-            var successful = await movieService.DeleteImage(imageId, movieId);
+            var movie = await movieService.GetOrderedMoviesById();
+
+            if (movie == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(movie);
+        }
+
+        [HttpDelete("delete-image")]
+        public async Task<IActionResult> DeleteImageByLink(string imgLink)
+        {
+            var successful = await movieService.DeleteImage(imgLink);
             if (successful)
             {
                 return Ok();
